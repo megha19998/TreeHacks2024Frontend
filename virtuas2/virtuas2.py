@@ -150,7 +150,7 @@ class State(rx.State):
         resp = update_gist(API_TOKEN, gist_id_write, result)
         print(API_TOKEN)
         print(resp)
-        time.sleep(90)
+        time.sleep(20)
         response = read_gist(gist_id_read)
         self.step = response
     
@@ -328,27 +328,38 @@ def addSteps(text):
         )
 
 def index() -> rx.Component:
-    return rx.center(
-            rx.box(
+    searchUI = rx.box(rx.hstack(
+                    rx.box(
+                        rx.image(src='logo.png', width="40px", height="40px"), width="50%"),
+                    rx.box(
+                        rx.input(
+                            placeholder="Ask a question", 
+                            on_change=State.handleChange, 
+                            value=State.inputBox,
+                            width="50em",
+                            align="right"), width="40%"),
+                    rx.box(
+                        rx.button(
+                            "Seek",
+                            align="right",
+                            color_scheme="yellow",
+                            on_click=State.onClick()
+                        ), width="5%"),
+                    rx.box(
+                        rx.button(
+                            rx.icon(tag="mic"),
+                            on_click = State.listen(),
+                            color_scheme="yellow",
+                            align="right"
+                        ), width="10%")
+                ),
+                padding="15px",
+                width="100%",
+                background_color="#1c9fe5")
+    
+    stepsComponent = rx.box(
                 rx.center(
                     rx.vstack(
-                        rx.hstack(
-                            rx.input(
-                                placeholder="Ask a question", 
-                                on_change=State.handleChange, 
-                                value=State.inputBox,
-                                width="50em"),
-                            rx.button(
-                                "Click",
-                            align="center", 
-                            spacing="7",
-                            on_click=State.onClick()
-                            ),
-                            rx.button(
-                                rx.icon(tag="mic"),
-                                on_click = State.listen()
-                            )
-                        ),
                         rx.scroll_area(
                             rx.foreach(
                                 State.step, addSteps
@@ -358,12 +369,13 @@ def index() -> rx.Component:
                         ),
                     ),
                     height="100vh",
-                    size="2"
                 ),
                 background_color="var(--gray-3)",
-                width="80%",
+                padding="20px"
             )
-        )
+    return rx.vstack(
+        searchUI, 
+        rx.center(stepsComponent))
 
 app = rx.App()
 app.add_page(index)
