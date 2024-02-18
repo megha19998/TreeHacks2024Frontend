@@ -283,7 +283,7 @@ def addSteps(text):
                             align_items="start",
                             direction="column",
                         ),
-                        rx.hstack(
+                        rx.vstack(
                             rx.vstack(
                                 rx.upload(
                                     rx.vstack(
@@ -295,17 +295,21 @@ def addSteps(text):
                                 ),
                                 rx.button(
                                 "Capture",
-                                on_click=lambda:State.captureImage()
-                                )
+                                on_click=lambda:State.captureImage(),
+                                color_scheme="yellow")
                             ),
                             #rx.hstack(rx.foreach(rx.selected_files, rx.text)),
-                            rx.button(
-                                "Upload",
-                                on_click=lambda:State.handle_upload(rx.upload_files()),
-                            ),
-                            rx.button(
-                                "Clear",
-                                on_click=State.clearImageArray,
+                            rx.hstack(
+                                rx.button(
+                                    "Upload",
+                                    on_click=lambda:State.handle_upload(rx.upload_files()),
+                                    color_scheme="yellow"
+                                ),
+                                rx.button(
+                                    "Clear",
+                                    on_click=State.clearImageArray,
+                                    color_scheme="yellow"
+                                )
                             ),
                             rx.foreach(State.img, lambda img: rx.image(
                                 src=rx.get_upload_url(img),
