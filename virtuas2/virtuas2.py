@@ -14,15 +14,94 @@ from pathlib import Path
 import speech_recognition as sr
 import pygame
 import time
+from dotenv import load_dotenv
+from github import Github
+from github import Auth
+import json
+import requests
 
+load_dotenv()
 docs_url = "https://reflex.dev/docs/getting-started/introduction"
 filename = f"{config.app_name}/{config.app_name}.py"
 recognizer = sr.Recognizer()
+
+GITHUB_API="https://api.github.com/users/codlocker"
+API_TOKEN=os.environ.get('GIT_API_KEY')
+gist_id_read=os.environ.get('GIT_GIST_ID_READ')
+gist_id_write=os.environ.get('GIT_GIST_ID_WRITE')
+
+def update_gist(token, gist_id_write, json_data):
+    headers = {
+        'Authorization': f'token {API_TOKEN}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+    data = {
+        'files': {
+            'request.json': {
+                'content': json.dumps(json_data)
+            },
+        }
+    }
+    response = requests.patch(f'https://api.github.com/gists/{gist_id_write}', json=data, headers=headers)
+    
+    if response.status_code == 200:
+        return response.json()['html_url']
+    else:
+        print(f'Failed to update gist: {response.status_code}')
+        return None
+
+def read_gist(gist_id_read):
+    headers = {
+        'Authorization': f'token {API_TOKEN}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+
+    response = requests.get(f'https://api.github.com/gists/{gist_id_read}', headers=headers)
+    print()
+    print()
+    #print(response)
+    #responseSteps = [line for line in response['answer'].split('\n') if len(line) > 0][1:]
+    if response.status_code == 200:
+        gist_data = response.json()
+        files = gist_data['files']
+        for file_info in files.values():
+            if file_info['filename'] == "response.json":
+                #responseSteps = [line for line in file_info['content']['answer'].split('\n') if len(line) > 0][1:]
+                print()
+                print()
+                jsonFile = json.loads(file_info['content'])
+                print("I am printing json")
+                print()
+                print()
+                print(jsonFile)
+                print()
+                print(type(jsonFile))
+                responseSteps = [line for line in jsonFile['answer'].split('\n') if (len(line) > 0)][1:]
+                #print(responseSteps)
+                return responseSteps
+    else:
+        print(f'Failed to read gist: {response.status_code}')
+        return ""
+    
+# # Example JSON data
+# json_data = {
+#     "answer" : response
+# }
+
+# # Example usage
+# token = '<fdfdsfdsfdsf>'
+# gist_id = 'ac86958f23270c6f346f950b7e418d58'
+# # gist_url = update_gist(token, gist_id, json_data)
+# #if gist_url:
+# #     print(f'Gist updated successfully: {gist_url}')
+# read_content = read_gist(gist_id)
+# print(read_content)
 
 class State(rx.State):
     """The app state."""
     img: list[str]
     inputBox: str
+    step: List[str] = []
 
     async def handle_upload(self, files: list[rx.UploadFile]):
         """Handle the upload of file(s).
@@ -51,6 +130,32 @@ class State(rx.State):
         if event == cv2.EVENT_LBUTTONDOWN:
             captured = True
             frame = param
+
+    def handleChange(self, newValue):
+        self.inputBox = newValue
+    
+    def clearImageArray(self): 
+        self.img.clear()
+        return rx.clear_selected_files()
+
+    def onClick(self):
+        #self.step =  ["step 1","step 2","step 3","step 4","step 5","step 6"]
+        print()
+        print()
+        print(self.inputBox)
+        response = str(self.inputBox)
+        result = {
+            "question" : self.inputBox
+        }
+        resp = update_gist(API_TOKEN, gist_id_write, result)
+        print(API_TOKEN)
+        print(resp)
+        time.sleep(90)
+        response = read_gist(gist_id_read)
+        self.step = response
+    
+    def finish_item(self, step: str):
+        self.step = [i for i in self.step if i != step]
 
     def captureImage(self):
         global captured, frame
@@ -98,7 +203,7 @@ class State(rx.State):
             print("Recognizing...")
             self.inputBox = recognizer.recognize_google(audio)
             print("You said:", self.inputBox)
-            return "Success"
+            return None
         except sr.UnknownValueError:
             print("Sorry, I couldn't understand what you said.")
             return None
@@ -113,7 +218,8 @@ class State(rx.State):
 color = "rgb(107,99,246)"
 
 def performOCR(image_path):
-    print(image_path)
+    #print(image_path)
+    phrases = ["Forgotten password?", "Forgot Password?", "Forgotten Account", "Send Code", "Enter Code", "Email or mobile number", "Search"]
     img = cv2.imread(image_path)
     reader = easyocr.Reader(['en'], gpu=False)
     text_ = reader.readtext(img)
@@ -121,12 +227,12 @@ def performOCR(image_path):
     threshold = 0.25
     ifTextPresent = False
     for t_, t in enumerate(text_):
-        if(t[1] == "Forgotten password?"):
+        if(t[1] in phrases):
             ifTextPresent = True
             break
     if(ifTextPresent):
         for t_, t in enumerate(text_):
-            if(t[1] == "Forgotten password?"):
+            if(t[1] in phrases):
                 print(t[1])
                 bbox, text, score = t 
                 print(text)
@@ -141,27 +247,31 @@ def performOCR(image_path):
         print(image_path)
         print("it is not here in if")
         return image_path.split("/")[-1]
+    
 
-class StepNumber(rx.State):
-    step: List[str] = []
 
-    def onClick(self):
-        self.step =  ["step 1","step 2","step 3","step 4","step 5","step 6"]
+# class StepNumber(rx.State):
+#     step: List[str] = []
 
-    def finish_item(self, step: str):
-        self.step = [i for i in self.step if i != step]
+    
+
+    # def finish_item(self, step: str):
+    #     self.step = [i for i in self.step if i != step]
 
 def addSteps(text):
     return rx.hstack(
-            rx.section(
+            rx.card(
                 rx.text(text),
                 padding_left="12px",
                 padding_right="12px",
                 background_color="var(--gray-2)",
+                style={"width": "700px"}
             ),
             rx.button(
                 "Done",
-                on_click=lambda: StepNumber.finish_item(text)
+                rx.icon(tag="check-check"),
+                on_click=lambda: State.finish_item(text),
+                color_scheme="green"
             ),
             rx.drawer.root(
                 rx.drawer.trigger(rx.button("Upload a Photo")),
@@ -188,14 +298,14 @@ def addSteps(text):
                                 on_click=lambda:State.captureImage()
                                 )
                             ),
-                            rx.hstack(rx.foreach(rx.selected_files, rx.text)),
+                            #rx.hstack(rx.foreach(rx.selected_files, rx.text)),
                             rx.button(
                                 "Upload",
                                 on_click=lambda:State.handle_upload(rx.upload_files()),
                             ),
                             rx.button(
                                 "Clear",
-                                on_click=rx.clear_selected_files,
+                                on_click=State.clearImageArray,
                             ),
                             rx.foreach(State.img, lambda img: rx.image(
                                 src=rx.get_upload_url(img),
@@ -219,34 +329,41 @@ def addSteps(text):
 
 def index() -> rx.Component:
     return rx.center(
-        rx.vstack(
-            rx.hstack(
-                rx.input(placeholder="Ask a question", value=State.inputBox),
-                rx.button(
-                    "Click",
-                align="center", 
-                spacing="7",
-                on_click=StepNumber.onClick
-                ),
-                rx.button(
-                    rx.image(
-                    src='mic.png',
-                    height='1em',
-                    width='1em'
+            rx.box(
+                rx.center(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.input(
+                                placeholder="Ask a question", 
+                                on_change=State.handleChange, 
+                                value=State.inputBox,
+                                width="50em"),
+                            rx.button(
+                                "Click",
+                            align="center", 
+                            spacing="7",
+                            on_click=State.onClick()
+                            ),
+                            rx.button(
+                                rx.icon(tag="mic"),
+                                on_click = State.listen()
+                            )
+                        ),
+                        rx.scroll_area(
+                            rx.foreach(
+                                State.step, addSteps
+                            ),
+                            scrollbars="both",
+                            style={"height": 500}
+                        ),
                     ),
-                    on_click = State.listen()
-                )
-            ),
-            rx.scroll_area(
-                rx.foreach(
-                    StepNumber.step, addSteps
+                    height="100vh",
+                    size="2"
                 ),
-                scrollbars="vertical",
-                style={"height": 500}
-            ),
-        ),
-        height="100vh",
-    )
+                background_color="var(--gray-3)",
+                width="80%",
+            )
+        )
 
 app = rx.App()
 app.add_page(index)
